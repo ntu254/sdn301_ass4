@@ -74,11 +74,34 @@ npm run dev     # Start Vite dev server on port 5173
 
 Xem hướng dẫn deploy chi tiết tại: **[DEPLOYMENT.md](./DEPLOYMENT.md)**
 
-Quick summary:
+### Deployment Options:
 
-- Backend: Deploy lên Render/Railway với MongoDB Atlas
-- Frontend: Deploy lên Vercel/Netlify
-- Full CI/CD automation với GitHub
+#### ⚡ KHUYÊN DÙNG: Vercel Full-Stack (Đơn giản nhất)
+
+Deploy cả backend + frontend trên 1 project Vercel duy nhất!
+
+**Hướng dẫn nhanh:** [VERCEL_FULL_STACK.md](./VERCEL_FULL_STACK.md)
+
+- ✅ Chỉ 1 project, 1 domain
+- ✅ Setup trong 5 phút
+- ✅ Free tier hào phóng
+- ✅ Auto HTTPS + CDN
+- ✅ GitHub auto-deploy
+
+**Quick steps:**
+
+1. Tạo `vercel.json` config
+2. Export backend app thay vì listen
+3. Deploy lên Vercel với MongoDB Atlas
+4. Done! 🎉
+
+#### 📦 Hoặc: Deploy Riêng (Traditional)
+
+- **Backend:** Deploy lên Render/Railway với MongoDB Atlas
+- **Frontend:** Deploy lên Vercel/Netlify
+- **Full CI/CD:** GitHub integration với auto-deploy
+
+**Hướng dẫn:** [QUICK_DEPLOY.md](./QUICK_DEPLOY.md)
 
 ## 📂 Project Structure Details
 

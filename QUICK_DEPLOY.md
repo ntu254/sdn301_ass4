@@ -1,5 +1,64 @@
 # 🚀 QUICK DEPLOY GUIDE - Assignment 4
 
+## 🌟 KHUYÊN DÙNG: VERCEL FULL-STACK (CẢ BACKEND + FRONTEND)
+
+**Deploy ĐƠN GIẢN NHẤT - Chỉ cần 1 project Vercel!**
+
+### ⚡ 3 BƯỚC - 5 PHÚT
+
+#### 1️⃣ Setup MongoDB Atlas (2 phút)
+
+```
+1. https://mongodb.com/cloud/atlas → Sign up
+2. Create Free Cluster → Database Access → Create user
+3. Network Access → Add IP: 0.0.0.0/0
+4. Copy connection string:
+   mongodb+srv://user:pass@cluster.mongodb.net/quiz_app
+```
+
+#### 2️⃣ Tạo vercel.json (30 giây)
+
+Tạo file `vercel.json` ở root project:
+
+```json
+{
+  "version": 2,
+  "rewrites": [
+    { "source": "/api/:path*", "destination": "/backend/src/server.js" }
+  ]
+}
+```
+
+Update `backend/src/app.js` - Export app thay vì listen:
+
+```javascript
+module.exports = app; // Thêm dòng này ở cuối file
+```
+
+Update `frontend/.env.production`:
+
+```env
+VITE_API_URL=/api
+```
+
+#### 3️⃣ Deploy trên Vercel (2 phút)
+
+```
+1. https://vercel.com → Import GitHub repo
+2. Environment Variables:
+   MONGO_URI=mongodb+srv://...
+   JWT_SECRET=your_secret_key
+   JWT_EXPIRES_IN=7d
+3. Deploy → Done! 🎉
+4. Seed database: cd backend && npm run seed
+```
+
+**🔗 Chi tiết:** Xem file [VERCEL_FULL_STACK.md](./VERCEL_FULL_STACK.md)
+
+---
+
+## 📦 HOẶC: DEPLOY RIÊNG BACKEND & FRONTEND
+
 ## TÓM TẮT NHANH - 5 PHÚT DEPLOY
 
 ### 1️⃣ SETUP MONGODB ATLAS (2 phút)

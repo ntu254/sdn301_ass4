@@ -233,6 +233,476 @@ VITE_API_URL=https://ass4-quiz-backend.onrender.com/api
 
 ---
 
+## 🎯 PHẦN 2B: DEPLOY FULL-STACK TRÊN VERCEL (CẢ BACKEND & FRONTEND)
+
+> **⚡ KHUYÊN DÙNG**: Đây là cách deploy ĐƠN GIẢN NHẤT - cả backend và frontend trong 1 project!
+
+### Ưu điểm deploy full-stack trên Vercel:
+
+- ✅ Chỉ cần 1 project, 1 domain
+- ✅ Backend chạy dạng Serverless Functions (auto-scale)
+- ✅ Free tier cực hào phóng (100GB bandwidth/month)
+- ✅ HTTPS tự động
+- ✅ Deploy nhanh (<1 phút)
+- ✅ GitHub integration (auto deploy khi push)
+
+### Hạn chế cần biết:
+
+- ⚠️ Function timeout: 10s (Hobby), 60s (Pro)
+- ⚠️ Cold start cho serverless functions
+- ⚠️ Cần cấu trúc lại code một chút
+
+---
+
+### Bước 1: Cấu trúc lại Project
+
+Tạo cấu trúc monorepo như sau:
+
+```
+Ass4/
+├── api/                    # Backend API (Serverless Functions)
+│   ├── index.js           # Main entry point
+│   └── routes/            # Các routes
+├── frontend/              # React frontend
+│   ├── src/
+│   ├── public/
+│   └── package.json
+├── shared/                # Code dùng chung (optional)
+│   ├── models/
+│   └── utils/
+├── vercel.json            # Vercel configuration
+└── package.json           # Root package.json
+```
+
+---
+
+### Bước 2: Chuyển Backend thành Serverless Functions
+
+#### 2.1: Tạo file `api/index.js`:
+
+```javascript
+const express = require("express");
+const cors = require("cors");
+const mongoose = require("mongoose");
+require("dotenv").config();
+
+// Import routes
+const authRoutes = require("../backend/src/routes/authRoutes");
+const quizRoutes = require("../backend/src/routes/quizRoutes");
+const questionRoutes = require("../backend/src/routes/questionRoutes");
+const { notFound, errorHandler } = require("../backend/src/middlewares/error");
+
+const app = express();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// MongoDB connection với connection pooling cho serverless
+let cachedDb = null;
+
+async function connectToDatabase() {
+  if (cachedDb) {
+    return cachedDb;
+  }
+
+  const connection = await mongoose.connect(process.env.MONGO_URI, {
+    serverSelectionTimeoutMS: 5000,
+    maxPoolSize: 10,
+  });
+
+  cachedDb = connection;
+  return connection;
+}
+
+// Connect to DB before handling request
+app.use(async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (error) {
+    res.status(500).json({ message: "Database connection failed" });
+  }
+});
+
+// Health check
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ message: "Backend is running on Vercel" });
+});
+
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/questions", questionRoutes);
+
+// Error handlers
+app.use(notFound);
+app.use(errorHandler);
+
+// Export for Vercel
+module.exports = app;
+```
+
+#### 2.2: Hoặc tạo file `api/[...all].js` (Catch-all route):
+
+```javascript
+// api/[...all].js
+const app = require("./index");
+
+module.exports = async (req, res) => {
+  return app(req, res);
+};
+```
+
+---
+
+### Bước 3: Tạo file `vercel.json` ở root project:
+
+```json
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
+}
+```
+
+**Hoặc config đơn giản hơn:**
+
+```json
+{
+  "version": 2,
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "devCommand": "cd frontend && npm run dev",
+  "installCommand": "npm install --prefix backend && npm install --prefix frontend",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    }
+  ],
+  "functions": {
+    "api/**/*.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
+  }
+}
+```
+
+---
+
+### Bước 4: Update Frontend API URL
+
+**frontend/.env.production:**
+
+```env
+VITE_API_URL=/api
+```
+
+Hoặc:
+
+```env
+VITE_API_URL=https://your-app.vercel.app/api
+```
+
+**frontend/src/api/client.js:**
+
+```javascript
+import axios from "axios";
+
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || "/api",
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+export default api;
+```
+
+---
+
+### Bước 5: Tạo `package.json` ở root (nếu chưa có):
+
+```json
+{
+  "name": "ass4-fullstack",
+  "version": "1.0.0",
+  "scripts": {
+    "install:backend": "cd backend && npm install",
+    "install:frontend": "cd frontend && npm install",
+    "install:all": "npm run install:backend && npm run install:frontend",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "vercel-build": "npm run build"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "mongoose": "^8.16.5",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0"
+  }
+}
+```
+
+---
+
+### Bước 6: Deploy lên Vercel
+
+#### Option A: Vercel Dashboard (Dễ nhất)
+
+1. Truy cập: https://vercel.com
+2. Sign up/Login với GitHub
+3. Click **"Add New"** → **"Project"**
+4. Import GitHub repository
+5. Configure:
+   - **Framework Preset**: Vite
+   - **Root Directory**: `./` (để trống hoặc root)
+   - **Build Command**: `npm run vercel-build` hoặc để mặc định
+   - **Output Directory**: `frontend/dist`
+
+6. **Environment Variables** - Thêm các biến:
+
+   ```
+   MONGO_URI=mongodb+srv://user:pass@cluster.mongodb.net/quiz_app
+   JWT_SECRET=your_super_secret_key_here
+   JWT_EXPIRES_IN=7d
+   NODE_ENV=production
+   VITE_API_URL=/api
+   ```
+
+7. Click **"Deploy"**
+8. Đợi 1-2 phút → Done! ✅
+
+#### Option B: Vercel CLI
+
+```bash
+# Cài Vercel CLI
+npm install -g vercel
+
+# Login
+vercel login
+
+# Deploy từ root folder
+vercel
+
+# Deploy production
+vercel --prod
+```
+
+Thêm environment variables:
+
+```bash
+vercel env add MONGO_URI production
+vercel env add JWT_SECRET production
+vercel env add JWT_EXPIRES_IN production
+vercel env add NODE_ENV production
+```
+
+---
+
+### Bước 7: Seed Database
+
+Sau khi deploy xong:
+
+**Option 1: Dùng Vercel CLI**
+
+```bash
+vercel env pull .env.local
+cd backend
+node src/seed.js
+```
+
+**Option 2: Chạy local với MongoDB Atlas**
+
+```bash
+cd backend
+# Update .env với MONGO_URI production
+npm run seed
+```
+
+**Option 3: Tạo API endpoint để seed**
+
+```javascript
+// api/seed.js (admin only, xóa sau khi dùng)
+const connectDB = require("../backend/src/config/db");
+const User = require("../backend/src/models/User");
+// ... import models
+
+module.exports = async (req, res) => {
+  try {
+    await connectDB();
+    // ... seed logic
+    res.json({ message: "Seeded successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+```
+
+Truy cập: `https://your-app.vercel.app/api/seed`
+
+---
+
+### Bước 8: Test Deployment
+
+1. Frontend: `https://your-app.vercel.app`
+2. Backend API: `https://your-app.vercel.app/api/health`
+3. Login: `https://your-app.vercel.app/login`
+
+Test API:
+
+```bash
+curl https://your-app.vercel.app/api/health
+curl -X POST https://your-app.vercel.app/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"123456"}'
+```
+
+---
+
+### 🔧 Troubleshooting Vercel Full-Stack
+
+#### Problem 1: API Routes không hoạt động
+
+**Giải pháp:**
+
+- Check `vercel.json` routes configuration
+- Ensure API files are in `/api` folder
+- Check function logs in Vercel dashboard
+
+#### Problem 2: MongoDB Connection Timeout
+
+**Giải pháp:**
+
+```javascript
+// Optimize connection for serverless
+mongoose.connect(MONGO_URI, {
+  serverSelectionTimeoutMS: 5000,
+  socketTimeoutMS: 45000,
+  maxPoolSize: 10,
+  minPoolSize: 5,
+});
+```
+
+#### Problem 3: Cold Start chậm
+
+**Giải pháp:**
+
+- Dùng connection pooling
+- Cache database connection
+- Minimize dependencies
+- Use Vercel Pro ($20/month) cho faster cold starts
+
+#### Problem 4: Function Timeout (10s limit)
+
+**Giải pháp:**
+
+- Optimize database queries
+- Add indexes to MongoDB
+- Use Vercel Pro for 60s timeout
+- Break long operations into smaller functions
+
+---
+
+### 💡 Tips cho Vercel Deployment
+
+1. **Optimize MongoDB Connection:**
+
+```javascript
+let cached = global.mongoose;
+
+if (!cached) {
+  cached = global.mongoose = { conn: null, promise: null };
+}
+
+async function connectDB() {
+  if (cached.conn) {
+    return cached.conn;
+  }
+
+  if (!cached.promise) {
+    cached.promise = mongoose.connect(MONGO_URI).then((mongoose) => {
+      return mongoose;
+    });
+  }
+
+  cached.conn = await cached.promise;
+  return cached.conn;
+}
+```
+
+2. **Environment Variables:**
+   - Never commit sensitive data
+   - Use Vercel Environment Variables
+   - Different vars for Preview vs Production
+
+3. **Auto Deploy:**
+   - Push to `main` branch → auto deploy production
+   - Push to other branches → preview deployments
+   - Pull requests → automatic preview URLs
+
+4. **Custom Domain:**
+   - Vercel Dashboard → Settings → Domains
+   - Add your domain (free SSL included)
+
+5. **Monitoring:**
+   - Check function logs in Vercel Dashboard
+   - Use Vercel Analytics (optional)
+   - Monitor MongoDB Atlas metrics
+
+---
+
+### 📊 Vercel Full-Stack vs Separate Deployment
+
+| Feature        | Vercel Full-Stack    | Separate (Render + Vercel) |
+| -------------- | -------------------- | -------------------------- |
+| Setup Time     | ⚡ 5 phút            | 🕐 10-15 phút              |
+| Cost           | 💰 Free              | 💰 Free                    |
+| Maintenance    | ✅ Dễ                | 🔧 Phức tạp hơn            |
+| Performance    | ⚡ Fast (CDN)        | 🚀 Depends                 |
+| Scalability    | 📈 Auto              | 📊 Limited on free         |
+| Cold Start     | ❄️ ~1-2s             | ❄️ Render ~30s             |
+| Function Limit | ⏱️ 10s (Hobby)       | ⏱️ No limit                |
+| Best For       | 🎯 Small-Medium apps | 🎯 Long-running tasks      |
+
+---
+
 ## 🔒 PHẦN 3: BẢO MẬT & TỐI ƯU
 
 ### 1. CORS Configuration (Backend)
