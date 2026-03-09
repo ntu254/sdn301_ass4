@@ -1,12 +1,8 @@
 {
   "version": 2,
-  "buildCommand": "cd backend && npm install && cd ../frontend && npm install && npm run build",
+  "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs20.x"
-    }
-  },
+  "installCommand": "cd backend && npm install && cd ../frontend && npm install",
   "rewrites": [
     {
       "source": "/api/:path*",
