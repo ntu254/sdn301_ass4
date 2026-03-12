@@ -1,5 +1,4 @@
 // Vercel Serverless Function Handler
-require("dotenv").config();
 const mongoose = require("mongoose");
 const app = require("../backend/src/app");
 
