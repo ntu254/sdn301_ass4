@@ -31,9 +31,6 @@ async function connectDB() {
 // Export Vercel Serverless Handler
 module.exports = async (req, res) => {
   try {
-    // Remove /api prefix from path for Express routing
-    req.url = req.url.replace(/^\/api/, '');
-
     await connectDB();
     return app(req, res);
   } catch (error) {
